@@ -1,0 +1,8 @@
+[package]
+name = "pood"
+version = "0.1.0"
+authors = ["apoorvaj <apoorva.ramesh.joshi@gmail.com>"]
+
+[dependencies]
+hyper = "0.9"
+xml-rs = "0.3"
