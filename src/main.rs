@@ -55,11 +55,22 @@ fn get_data_from_url(url: &String) -> Podcast {
     for event in parser {
         match event {
             Ok(XmlEvent::StartElement { name, attributes, .. }) => {
-                last_tag = name.local_name;
-                if last_tag == "item" {
-                    episodes.push(Episode::new());
-                    in_item_tag = true;
+                match name.local_name.as_ref() {
+                    "item" => {
+                        episodes.push(Episode::new());
+                        in_item_tag = true;
+                    },
+                    "enclosure" => {
+                        for attrib in attributes {
+                            if attrib.name.local_name != "url" { continue; }
+                            episodes.last_mut().unwrap().url = attrib.value;
+                            break;
+                        }
+                    },
+                    _ => {}
                 }
+
+                last_tag = name.local_name;
             }
             Ok(XmlEvent::EndElement { name }) => {
                 if name.local_name == "item" {
@@ -76,6 +87,8 @@ fn get_data_from_url(url: &String) -> Podcast {
                         else           { description = data; },
                     "pubDate" =>
                         episodes.last_mut().unwrap().date = data,
+                    "duration" =>
+                        episodes.last_mut().unwrap().duration = data,
                     _ => {}
                 }
             }
