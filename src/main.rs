@@ -4,7 +4,6 @@ extern crate xml;
 use hyper::Client;
 use std::env;
 use std::io::Read;
-use std::io::Write;
 use xml::reader::{EventReader, XmlEvent};
 
 struct Episode {
@@ -13,6 +12,12 @@ struct Episode {
     url: String,
     date: String,
     duration: String,
+}
+
+struct Podcast {
+    title: String,
+    description: String,
+    episodes: Vec<Episode>,
 }
 
 impl Episode {
@@ -27,81 +32,79 @@ impl Episode {
     }
 }
 
+fn get_data_from_url(url: &String) -> Podcast {
+    let mut title = String::new();
+    let mut description = String::new();
+    let mut episodes = Vec::new();
+
+    // Send http request
+    let client = Client::new();
+    let mut response = client.get(url)
+        .send()
+        .unwrap();
+
+    // Read response, init parser
+    let mut xml = String::new();
+    response.read_to_string(&mut xml).unwrap();
+    let parser = EventReader::from_str(&xml);
+
+    // Parse the response
+    let mut in_item_tag = false;
+    let mut last_tag = String::new();
+
+    for event in parser {
+        match event {
+            Ok(XmlEvent::StartElement { name, attributes, .. }) => {
+                last_tag = name.local_name;
+                if last_tag == "item" {
+                    episodes.push(Episode::new());
+                    in_item_tag = true;
+                }
+            }
+            Ok(XmlEvent::EndElement { name }) => {
+                if name.local_name == "item" {
+                    in_item_tag = false;
+                }
+            }
+            Ok(XmlEvent::Characters(data)) => {
+                match last_tag.as_ref() {
+                    "title" =>
+                        if in_item_tag { episodes.last_mut().unwrap().title = data; }
+                        else           { title = data; },
+                    "description" =>
+                        if in_item_tag { episodes.last_mut().unwrap().description = data; }
+                        else           { description = data; },
+                    "pubDate" =>
+                        episodes.last_mut().unwrap().date = data,
+                    _ => {}
+                }
+            }
+            Err(event) => {
+                println!("Error: {}", event);
+                break;
+            }
+            _ => {}
+        }
+    }
+
+    Podcast { title: title, description: description, episodes: episodes }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     // let base_path = "~/Music/podcasts";
 
     // Parse options
     if args.len() == 3 && args[1] == "info" {
-        let ref url = args[2];
-
-        // Send http request
-        let client = Client::new();
-        let mut response = client.get(url)
-            .send()
-            .unwrap();
-
-        // Read response, init parser
-        let mut body = String::new();
-        response.read_to_string(&mut body).unwrap();
-        let parser = EventReader::from_str(&body);
-
-        // Parse the response
-        let mut tags: Vec<String> = Vec::new();
-        let mut title = "".to_string();
-        let mut episodes: Vec<Episode> = Vec::new();
-
-        for event in parser {
-            match event {
-                Ok(XmlEvent::StartElement { name, attributes, .. }) => {
-                    if name.local_name == "item" {
-                        episodes.push(Episode::new());
-                    }
-                    tags.push(name.local_name);
-                }
-                Ok(XmlEvent::EndElement { .. }) => {
-                    tags.pop();
-                }
-                Ok(XmlEvent::Characters(data)) => {
-                    let parent: &str = match tags.last() {
-                        None => "",
-                        Some(x) => x
-                    };
-                    let grandparent: &str = match tags.get(tags.len() - 2) {
-                        None => "",
-                        Some(x) => x
-                    };
-
-                    if grandparent == "channel" && parent == "title" {
-                        title = data;
-                    } else if grandparent == "item" && episodes.len() > 0 {
-                        match parent.as_ref() {
-                            "title" => episodes.last_mut().unwrap().title = data,
-                            _ => {}
-                        }
-                        // if parent == "title" {
-                        //     println!("EPISODE: {}", data);
-                        //     episodes.push(data);
-                        // } else if parent == 
-                    }
-                }
-                Err(event) => {
-                    println!("Error: {}", event);
-                    break;
-                }
-                _ => {}
-            }
+        let podcast = get_data_from_url(&args[2]);
+        println!("{}", podcast.title);
+        println!("{}", podcast.description);
+        for episode in podcast.episodes.iter().rev() {
+            println!("    + {}", episode.title);
+            println!("          {}, {}, {}", episode.duration
+                                           , episode.date
+                                           , episode.url);
+            println!("          {}", episode.description);
         }
-
-        println!("{}", title);
-        for episode in episodes {
-            println!("    {}", episode.title);
-        }
-        // let mut file = OpenOptions::new().write(true)
-        //                                  .create(true)
-        //                                  .open(name).unwrap();
-        // let _ = file.write(body.as_bytes());
     }
-
-    println!("==============");
 }
