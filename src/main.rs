@@ -105,19 +105,47 @@ fn get_data_from_url(url: &String) -> Podcast {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    // let base_path = "~/Music/podcasts";
+    // TODO: Remove this and create stuff in the current directory
+    let base_path = "/home/apoorvaj/Music/podcasts/".to_string();
 
     // Parse options
-    if args.len() == 3 && args[1] == "info" {
-        let podcast = get_data_from_url(&args[2]);
-        println!("{}", podcast.title);
-        println!("{}", podcast.description);
-        for episode in podcast.episodes.iter().rev() {
-            println!("    + {}", episode.title);
-            println!("          {}, {}, {}", episode.duration
-                                           , episode.date
-                                           , episode.url);
-            println!("          {}", episode.description);
-        }
+    // TODO: Print friendly error messages on invalid arg count
+    match args[1].as_ref() {
+        "info" => {
+            // TODO: Display info in a sane way
+            if args.len() == 3 {
+                let podcast = get_data_from_url(&args[2]);
+                println!("{}", podcast.title);
+                println!("{}", podcast.description);
+                for episode in podcast.episodes.iter().rev() {
+                    println!("    + {}", episode.title);
+                    println!("          {}, {}, {}", episode.duration
+                                                   , episode.date
+                                                   , episode.url);
+                    println!("          {}", episode.description);
+                }
+
+            }
+        },
+        "add" => {
+            let podcast = get_data_from_url(&args[2]);
+
+            // Check whether folder exists
+            let podcastFolder: String = base_path + &podcast.title;
+            match std::fs::metadata(&podcastFolder) {
+                Ok(x) => {
+                    println!("Podcast {:?} already exists in this directory",
+                             podcast.title);
+                },
+                Err(x) => {
+                    match std::fs::create_dir(podcastFolder) {
+                        Err(x) => println!("Couldn't create folder {:?}", podcast.title),
+                        _ => {}
+                    }
+                }
+            }
+        },
+        _ => {}
     }
 }
+
