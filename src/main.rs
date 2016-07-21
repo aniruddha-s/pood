@@ -7,7 +7,6 @@ use std::fs::OpenOptions;
 use std::io::Read;
 use std::io::Write;
 use std::process;
-use std::path::Path;
 use xml::reader::{EventReader, XmlEvent};
 
 struct Episode {
@@ -109,8 +108,7 @@ fn get_data_from_url(url: &String) -> Podcast {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    // TODO: Remove this and create stuff in the current directory
-    let base_path = "/home/apoorvaj/Music/podcasts/".to_string();
+    let mut path = std::env::current_dir().unwrap();
 
     // Parse options
     // TODO: Print friendly error messages on invalid arg count
@@ -133,21 +131,21 @@ fn main() {
         },
         "add" => {
             let podcast = get_data_from_url(&args[2]);
-            let podcast_folder: String = base_path + &podcast.title;
+            path.push(&podcast.title);
 
             // Create folder if it doesn't exist
-            if !Path::new(&podcast_folder).exists() {
-                std::fs::create_dir(&podcast_folder).unwrap();
+            if !path.exists() {
+                std::fs::create_dir(&path).unwrap();
             }
 
             // Create the pood.yaml file inside the newly created folder
-            let file_name: String = podcast_folder + "/pood.yaml";
-            if !Path::new(&file_name).exists() {
+            path.push("pood.yaml");
+            if !path.exists() {
                 let mut file = OpenOptions::new()
                             .create_new(true)
                             .read(true)
                             .write(true)
-                            .open(file_name).unwrap();
+                            .open(path).unwrap();
                 let yaml = format!("title : {}\n\
                                     url : {}\n",
                                     podcast.title,
