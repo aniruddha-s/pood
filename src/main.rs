@@ -3,7 +3,11 @@ extern crate xml;
 
 use hyper::Client;
 use std::env;
+use std::fs::OpenOptions;
 use std::io::Read;
+use std::io::Write;
+use std::process;
+use std::path::Path;
 use xml::reader::{EventReader, XmlEvent};
 
 struct Episode {
@@ -129,22 +133,32 @@ fn main() {
         },
         "add" => {
             let podcast = get_data_from_url(&args[2]);
+            let podcast_folder: String = base_path + &podcast.title;
 
-            // Check whether folder exists
-            let podcastFolder: String = base_path + &podcast.title;
-            match std::fs::metadata(&podcastFolder) {
-                Ok(x) => {
-                    println!("Podcast {:?} already exists in this directory",
-                             podcast.title);
-                },
-                Err(x) => {
-                    match std::fs::create_dir(podcastFolder) {
-                        Err(x) => println!("Couldn't create folder {:?}", podcast.title),
-                        _ => {}
-                    }
-                }
+            // Create folder if it doesn't exist
+            if !Path::new(&podcast_folder).exists() {
+                std::fs::create_dir(&podcast_folder).unwrap();
             }
-        },
+
+            // Create the pood.yaml file inside the newly created folder
+            let file_name: String = podcast_folder + "/pood.yaml";
+            if !Path::new(&file_name).exists() {
+                let mut file = OpenOptions::new()
+                            .create_new(true)
+                            .read(true)
+                            .write(true)
+                            .open(file_name).unwrap();
+                let yaml = format!("title : {}\n\
+                                    url : {}\n",
+                                    podcast.title,
+                                    &args[2]);
+                file.write_all(yaml.as_bytes()).unwrap();
+            } else {
+                println!("Podcast already exists in the current folder");
+                process::exit(0);
+            }
+            
+        }
         _ => {}
     }
 }
