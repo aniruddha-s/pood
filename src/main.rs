@@ -96,7 +96,7 @@ fn get_data_from_url(url: &String) -> Podcast {
                     "title" =>
                         if in_item_tag { episodes.last_mut().unwrap().title = data; }
                         else           { title = data; },
-                    "description" =>
+                    "description" | "summary" =>
                         if in_item_tag { episodes.last_mut().unwrap().description = data; }
                         else           { description = data; },
                     "pubDate" =>
@@ -104,6 +104,13 @@ fn get_data_from_url(url: &String) -> Podcast {
                     "duration" =>
                         episodes.last_mut().unwrap().duration = data,
                     _ => {}
+                }
+            }
+            Ok(XmlEvent::CData(data)) => {
+                if last_tag == "summary" {
+                    description = data;
+                } else if last_tag == "description" && in_item_tag {
+                    episodes.last_mut().unwrap().description = data;
                 }
             }
             Err(event) => {
@@ -142,7 +149,6 @@ fn get_data_from_yaml(path: PathBuf) -> Podcast {
         let line = line.unwrap();
         if line.contains("title :") {
             title = line.replace("title : ", "");
-            println!("{}", title);
         } else if line.contains("url :") {
             url = line.replace("url : ", "");
         }
@@ -207,11 +213,13 @@ fn main() {
             }
         }
         "sync" => {
+            // Parse local yaml to get podcast url and existing episodes
             path.push("pood.yaml");
-            let podcast_file = get_data_from_yaml(path);
+            let file_podcast = get_data_from_yaml(path);
 
             // Fetch podcast from url
-            // let podcast = get_data_from_url(&args[2]);
+            let web_podcast = get_data_from_url(&file_podcast.url);
+            println!("{}", web_podcast.description);
         },
         _ => {}
     }
