@@ -2,6 +2,7 @@
 //
 // TODO:
 // - Better error messages
+// - Handle most error cases
 //
 
 extern crate hyper;
@@ -130,10 +131,10 @@ fn get_data_from_url(url: &String) -> Podcast {
     }
 }
 
-fn get_data_from_yaml(path: PathBuf) -> Podcast {
-    // If yaml file doesn't exist, error and exit
+fn get_data_from_file(path: PathBuf) -> Podcast {
+    // If file doesn't exist, error and exit
     if !path.exists() {
-        println!("pood.yaml not found. Use \"pood add [podcast_url]\" to add a \
+        println!(".pood file not found. Use \"pood add [podcast_url]\" to add a \
                  podcast.");
         process::exit(0);
     }
@@ -145,12 +146,27 @@ fn get_data_from_yaml(path: PathBuf) -> Podcast {
     let mut url      = String::new();
     let mut episodes = Vec::new();
 
-    for line in file.lines() {
+    let mut lines = file.lines();
+
+    title = lines.next().unwrap().unwrap().replace("title : ", "");
+    url   = lines.next().unwrap().unwrap().replace("url   : ", "");
+
+    for line in lines {
         let line = line.unwrap();
-        if line.contains("title :") {
-            title = line.replace("title : ", "");
-        } else if line.contains("url :") {
-            url = line.replace("url : ", "");
+        if line == "" {
+            println!("Pushed new episode");
+            episodes.push(Episode::new());
+        } else {
+            let (key, value) = line.split_at(14);
+            let value = value.to_string();
+            match key {
+                "title       : " => episodes.last_mut().unwrap().title       = value,
+                "description : " => episodes.last_mut().unwrap().description = value,
+                "url         : " => episodes.last_mut().unwrap().url         = value,
+                "date        : " => episodes.last_mut().unwrap().date        = value,
+                "duration    : " => episodes.last_mut().unwrap().duration    = value,
+                _                => {}
+            }
         }
     }
 
@@ -195,27 +211,29 @@ fn main() {
                 std::fs::create_dir(&path).unwrap();
             }
 
-            // Create the pood.yaml file inside the newly created folder
-            path.push("pood.yaml");
+            // Create the .pood file inside the newly created folder
+            path.push(".pood");
             if !path.exists() {
                 let mut file = OpenOptions::new()
                             .create_new(true)
                             .read(true)
                             .write(true)
                             .open(path).unwrap();
-                let yaml = format!("title : {}\nurl : {}\nepisodes :\n",
+                let data = format!("title : {}\n\
+                                    url   : {}\n\n",
                                     podcast.title,
                                     &args[2]);
-                file.write_all(yaml.as_bytes()).unwrap();
+                file.write_all(data.as_bytes()).unwrap();
+                println!("Added podcast {:?}", podcast.title);
             } else {
                 println!("Podcast already exists in the current folder");
                 process::exit(0);
             }
         }
         "sync" => {
-            // Parse local yaml to get podcast url and existing episodes
-            path.push("pood.yaml");
-            let file_podcast = get_data_from_yaml(path);
+            // Parse local file to get podcast url and existing episodes
+            path.push(".pood");
+            let file_podcast = get_data_from_file(path);
 
             // Fetch podcast from url
             let web_podcast = get_data_from_url(&file_podcast.url);
