@@ -175,7 +175,7 @@ fn main() {
                 let podcast = get_data_from_url(&args[2]);
                 println!("{}", podcast.title);
                 println!("{}", podcast.description);
-                for episode in podcast.episodes.iter().rev() {
+                for episode in podcast.episodes {
                     println!("    + {}", episode.title);
                     println!("          {}, {}, {}", episode.duration
                                                    , episode.date
