@@ -1,12 +1,22 @@
+// pood : A command-line podcast manager
+//
+// TODO:
+// - Better error messages
+//
+
 extern crate hyper;
 extern crate xml;
 
 use hyper::Client;
 use std::env;
 use std::fs::OpenOptions;
+use std::fs::File;
 use std::io::Read;
 use std::io::Write;
+use std::io::BufReader;
+use std::io::BufRead;
 use std::process;
+use std::path::PathBuf;
 use xml::reader::{EventReader, XmlEvent};
 
 struct Episode {
@@ -20,6 +30,7 @@ struct Episode {
 struct Podcast {
     title: String,
     description: String,
+    url: String,
     episodes: Vec<Episode>,
 }
 
@@ -89,7 +100,7 @@ fn get_data_from_url(url: &String) -> Podcast {
                         if in_item_tag { episodes.last_mut().unwrap().description = data; }
                         else           { description = data; },
                     "pubDate" =>
-                        episodes.last_mut().unwrap().date = data,
+                        if in_item_tag { episodes.last_mut().unwrap().date = data; },
                     "duration" =>
                         episodes.last_mut().unwrap().duration = data,
                     _ => {}
@@ -103,7 +114,46 @@ fn get_data_from_url(url: &String) -> Podcast {
         }
     }
 
-    Podcast { title: title, description: description, episodes: episodes }
+    episodes.reverse();
+    Podcast {
+        title       : title,
+        description : description,
+        url         : url.to_string(),
+        episodes    : episodes
+    }
+}
+
+fn get_data_from_yaml(path: PathBuf) -> Podcast {
+    // If yaml file doesn't exist, error and exit
+    if !path.exists() {
+        println!("pood.yaml not found. Use \"pood add [podcast_url]\" to add a \
+                 podcast.");
+        process::exit(0);
+    }
+
+    let file = File::open(path).unwrap();
+    let file = BufReader::new(file);
+
+    let mut title    = String::new();
+    let mut url      = String::new();
+    let mut episodes = Vec::new();
+
+    for line in file.lines() {
+        let line = line.unwrap();
+        if line.contains("title :") {
+            title = line.replace("title : ", "");
+            println!("{}", title);
+        } else if line.contains("url :") {
+            url = line.replace("url : ", "");
+        }
+    }
+
+    Podcast {
+        title       : title,
+        description : String::new(),
+        url         : url.to_string(),
+        episodes    : episodes
+    }
 }
 
 fn main() {
@@ -131,7 +181,8 @@ fn main() {
         },
         "add" => {
             let podcast = get_data_from_url(&args[2]);
-            path.push(&podcast.title);
+            let sanitized_title = podcast.title.replace(" ", "_").replace("'","");
+            path.push(sanitized_title);
 
             // Create folder if it doesn't exist
             if !path.exists() {
@@ -146,8 +197,7 @@ fn main() {
                             .read(true)
                             .write(true)
                             .open(path).unwrap();
-                let yaml = format!("title : {}\n\
-                                    url : {}\n",
+                let yaml = format!("title : {}\nurl : {}\nepisodes :\n",
                                     podcast.title,
                                     &args[2]);
                 file.write_all(yaml.as_bytes()).unwrap();
@@ -155,8 +205,14 @@ fn main() {
                 println!("Podcast already exists in the current folder");
                 process::exit(0);
             }
-            
         }
+        "sync" => {
+            path.push("pood.yaml");
+            let podcast_file = get_data_from_yaml(path);
+
+            // Fetch podcast from url
+            // let podcast = get_data_from_url(&args[2]);
+        },
         _ => {}
     }
 }
