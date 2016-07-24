@@ -196,7 +196,7 @@ fn sync_file_and_web(path: &PathBuf, file_podcast: Podcast, web_podcast: Podcast
             }
         }
 
-        if duplicate { break; }
+        if duplicate { continue; }
 
         data.push_str(&format!("title       : {}\n\
                                 description : {}\n\
