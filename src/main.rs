@@ -20,6 +20,8 @@ use std::process;
 use std::path::PathBuf;
 use xml::reader::{EventReader, XmlEvent};
 
+static POOD_FILE_NAME: &'static str = ".pood";
+
 struct Episode {
     title: String,
     description: String,
@@ -131,11 +133,11 @@ fn get_data_from_url(url: &String) -> Podcast {
     }
 }
 
-fn get_data_from_file(path: PathBuf) -> Podcast {
+fn get_data_from_file(path: &PathBuf) -> Podcast {
     // If file doesn't exist, error and exit
     if !path.exists() {
-        println!(".pood file not found. Use \"pood add [podcast_url]\" to add a \
-                 podcast.");
+        println!("{} file not found. Use \"pood add [podcast_url]\" to add a \
+                 podcast.", POOD_FILE_NAME);
         process::exit(0);
     }
 
@@ -153,8 +155,7 @@ fn get_data_from_file(path: PathBuf) -> Podcast {
 
     for line in lines {
         let line = line.unwrap();
-        if line == "" {
-            println!("Pushed new episode");
+        if line.trim() == "" {
             episodes.push(Episode::new());
         } else {
             let (key, value) = line.split_at(14);
@@ -176,6 +177,41 @@ fn get_data_from_file(path: PathBuf) -> Podcast {
         url         : url.to_string(),
         episodes    : episodes
     }
+}
+
+fn sync_file_and_web(path: &PathBuf, file_podcast: Podcast, web_podcast: Podcast) {
+    let mut file = OpenOptions::new()
+                .read(true)
+                .append(true)
+                .open(path).unwrap();
+    let mut data = String::new();
+    let mut new_episodes = 0;
+
+    for web_episode in &web_podcast.episodes {
+        let mut duplicate = false;
+        for file_episode in &file_podcast.episodes {
+            if web_episode.title == file_episode.title {
+                duplicate = true;
+                break;
+            }
+        }
+
+        if duplicate { break; }
+
+        data.push_str(&format!("title       : {}\n\
+                                description : {}\n\
+                                url         : {}\n\
+                                date        : {}\n\
+                                duration    : {}\n\n",
+                                web_episode.title,
+                                web_episode.description,
+                                web_episode.url,
+                                web_episode.date,
+                                web_episode.duration));
+        new_episodes = new_episodes + 1;
+    }
+    file.write_all(data.as_bytes()).unwrap();
+    println!("Found {} new episodes", new_episodes);
 }
 
 fn main() {
@@ -212,7 +248,7 @@ fn main() {
             }
 
             // Create the .pood file inside the newly created folder
-            path.push(".pood");
+            path.push(POOD_FILE_NAME);
             if !path.exists() {
                 let mut file = OpenOptions::new()
                             .create_new(true)
@@ -232,12 +268,12 @@ fn main() {
         }
         "sync" => {
             // Parse local file to get podcast url and existing episodes
-            path.push(".pood");
-            let file_podcast = get_data_from_file(path);
-
+            path.push(POOD_FILE_NAME);
+            let file_podcast = get_data_from_file(&path);
             // Fetch podcast from url
             let web_podcast = get_data_from_url(&file_podcast.url);
-            println!("{}", web_podcast.description);
+
+            sync_file_and_web(&path, file_podcast, web_podcast);
         },
         _ => {}
     }
