@@ -155,19 +155,19 @@ fn get_data_from_file(path: &PathBuf) -> Podcast {
 
     for line in lines {
         let line = line.unwrap();
-        if line.trim() == "" {
-            episodes.push(Episode::new());
-        } else {
-            let (key, value) = line.split_at(14);
-            let value = value.to_string();
-            match key {
-                "title       : " => episodes.last_mut().unwrap().title       = value,
-                "description : " => episodes.last_mut().unwrap().description = value,
-                "url         : " => episodes.last_mut().unwrap().url         = value,
-                "date        : " => episodes.last_mut().unwrap().date        = value,
-                "duration    : " => episodes.last_mut().unwrap().duration    = value,
-                _                => {}
-            }
+        if line.len() <= 14 { continue; }
+        let (key, value) = line.split_at(14);
+        let value = value.to_string();
+        match key {
+            "title       : " => {
+                episodes.push(Episode::new());
+                episodes.last_mut().unwrap().title = value;
+            },
+            "description : " => episodes.last_mut().unwrap().description = value,
+            "url         : " => episodes.last_mut().unwrap().url         = value,
+            "date        : " => episodes.last_mut().unwrap().date        = value,
+            "duration    : " => episodes.last_mut().unwrap().duration    = value,
+            _                => {}
         }
     }
 
@@ -274,6 +274,18 @@ fn main() {
             let web_podcast = get_data_from_url(&file_podcast.url);
 
             sync_file_and_web(&path, file_podcast, web_podcast);
+        },
+        "list" => {
+            path.push(POOD_FILE_NAME);
+            let podcast = get_data_from_file(&path);
+
+            for i in 0..podcast.episodes.len() {
+                println!("({})\t{}", i, podcast.episodes[i].title);
+            }
+        },
+        "download" => {
+            path.push(POOD_FILE_NAME);
+            let podcast = get_data_from_file(&path);
         },
         _ => {}
     }
