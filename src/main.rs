@@ -286,8 +286,11 @@ fn main() {
         "download" => {
             path.push(POOD_FILE_NAME);
             let podcast = get_data_from_file(&path);
+            println!("{}", podcast.episodes[0].url);
         },
-        _ => {}
+        _ => {
+            println!("Invalid parameter {:?}", args[1]);
+        }
     }
 }
 
