@@ -17,6 +17,7 @@ use std::io::Write;
 use std::io::BufReader;
 use std::io::BufRead;
 use std::process;
+use std::process::Command;
 use std::path::PathBuf;
 use xml::reader::{EventReader, XmlEvent};
 
@@ -286,7 +287,9 @@ fn main() {
         "download" => {
             path.push(POOD_FILE_NAME);
             let podcast = get_data_from_file(&path);
-            println!("{}", podcast.episodes[0].url);
+            let ref episode = podcast.episodes[0];
+            println!("Downloading episode: \"{}\"...", episode.title);
+            Command::new("wget").arg("-q").arg(&episode.url).status();
         },
         _ => {
             println!("Invalid parameter {:?}", args[1]);
